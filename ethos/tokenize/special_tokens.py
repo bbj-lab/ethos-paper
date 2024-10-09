@@ -27,6 +27,22 @@ class SpecialToken:
     }
     SEPARATOR_NAMES = list(SEPARATORS.keys())
     SEPARATOR_SIZES = np.fromiter(SEPARATORS.values(), dtype=TIME_DTYPE)
+    CLOCKS = {
+        "_mdnt-2a": [0, 1],
+        "_2a-4a": [2, 3],
+        "_4a-6a": [4, 5],
+        "_6a-8a": [6, 7],
+        "_8a-10a": [8, 9],
+        "_10a-noon": [10, 11],
+        "_noon-2p": [12, 13],
+        "_2p-4p": [14, 15],
+        "_4p-6p": [16, 17],
+        "_6p-8p": [18, 19],
+        "_8p-10p": [20, 21],
+        "_10p-mdnt": [22, 23],
+    }
+    CLOCK_NAMES = list(CLOCKS.keys())
+    CLOCK_STARTS = sorted(min(c) for c in CLOCKS.values())
     TIMELINE_END = "_TIMELINE_END"
     DEATH = "_DEATH"
 
@@ -37,11 +53,21 @@ class SpecialToken:
 
     DECILES = [f"_Q{i}" for i in range(1, 11)]
 
-    ALL = [*SEPARATOR_NAMES, TIMELINE_END, DEATH, *YEAR_NAMES, *DECILES]
+    ALL = [
+        *SEPARATOR_NAMES,
+        *CLOCK_NAMES,
+        TIMELINE_END,
+        DEATH,
+        *YEAR_NAMES,
+        *DECILES,
+    ]
 
     @staticmethod
     def get_longest_separator() -> (str, float):
-        return SpecialToken.SEPARATOR_NAMES[-1], SpecialToken.SEPARATOR_SIZES[-1]
+        return (
+            SpecialToken.SEPARATOR_NAMES[-1],
+            SpecialToken.SEPARATOR_SIZES[-1],
+        )
 
     @staticmethod
     def age_to_year_token(age: float) -> str:

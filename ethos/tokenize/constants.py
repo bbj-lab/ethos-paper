@@ -39,10 +39,10 @@ class DataProp:
         return DataProp(
             name=dataset,
             fold=fold,
-            dataset_dir="mimic-iv-2.2_Data",
+            dataset_dir="mimic-iv-3.0_Data",
             id_col="subject_id",
-            fold_dir=f"mimic-iv-2.2_{suffix}",
-            fold_suffix=f"_{fold.value}",
+            fold_dir=f"mimic-iv-3.0_{suffix}", # f"{DataFold.TRAIN}"
+            fold_suffix=f"", # f"_{fold.value}"
             csv_format="csv.gz",
             module=dataset.value,
         )
