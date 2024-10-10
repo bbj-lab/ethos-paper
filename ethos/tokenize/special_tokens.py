@@ -28,21 +28,33 @@ class SpecialToken:
     SEPARATOR_NAMES = list(SEPARATORS.keys())
     SEPARATOR_SIZES = np.fromiter(SEPARATORS.values(), dtype=TIME_DTYPE)
     CLOCKS = {
-        "_mdnt-2a": [0, 1],
-        "_2a-4a": [2, 3],
-        "_4a-6a": [4, 5],
-        "_6a-8a": [6, 7],
-        "_8a-10a": [8, 9],
-        "_10a-noon": [10, 11],
-        "_noon-2p": [12, 13],
-        "_2p-4p": [14, 15],
-        "_4p-6p": [16, 17],
-        "_6p-8p": [18, 19],
-        "_8p-10p": [20, 21],
-        "_10p-mdnt": [22, 23],
+        "_mdnt-1a": 0,
+        "_1a-2a": 1,
+        "_2a-3a": 2,
+        "_3a-4a": 3,
+        "_4a-5a": 4,
+        "_5a-6a": 5,
+        "_6a-7a": 6,
+        "_7a-8a": 7,
+        "_8a-9a": 8,
+        "_9a-10a": 9,
+        "_10a-11a": 10,
+        "_11a-noon": 11,
+        "_noon-1p": 12,
+        "_1p-2p": 13,
+        "_2p-3p": 14,
+        "_3p-4p": 15,
+        "_4p-5p": 16,
+        "_5p-6p": 17,
+        "_6p-7p": 18,
+        "_7p-8p": 19,
+        "_8p-9p": 20,
+        "_9p-10p": 21,
+        "_10p-11p": 22,
+        "_11p-mdnt": 23,
     }
-    CLOCK_NAMES = list(CLOCKS.keys())
-    CLOCK_STARTS = sorted(min(c) for c in CLOCKS.values())
+    CLOCK_NAMES = sorted(CLOCKS.keys(), key=CLOCKS.__getitem__)
+    CLOCK_STARTS = sorted(CLOCKS.values())
     TIMELINE_END = "_TIMELINE_END"
     DEATH = "_DEATH"
 

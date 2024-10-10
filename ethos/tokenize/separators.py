@@ -1,5 +1,5 @@
-from datetime import datetime
-from itertools import zip_longest
+from datetime import datetime, timezone
+from itertools import zip_longest, chain
 from typing import Iterable
 
 import numpy as np
@@ -11,7 +11,11 @@ from .special_tokens import SpecialToken
 
 def tm2hr(tm: float) -> int:
     """convert curious floating year representation into an hour 0-23"""
-    return int(datetime.fromtimestamp(tm * SECONDS_IN_YEAR).strftime("%H"))
+    return int(
+        datetime.fromtimestamp(tm * SECONDS_IN_YEAR, tz=timezone.utc).strftime(
+            "%H"
+        )
+    )
 
 
 class SeparatorInjector:
@@ -69,30 +73,40 @@ class SeparatorInjector:
             [tm2hr(t) for t in sorted_times], SpecialToken.CLOCK_STARTS
         )
         clock_tokens = (self._clock_bin_to_token[t] for t in binned_times)
-        tokens = np.fromiter(
-            (
-                self._conv_token_to_uint(token, self._timeline_end_token)
-                for event_token, clock_token, sep_token in zip_longest(
-                    sorted_event_tokens, clock_tokens, separator_tokens
-                )
-                for token in (
-                    (
-                        event_token,
-                        clock_token,
-                        *(
-                            sep_token
-                            if isinstance(sep_token, list)
-                            else [sep_token]
-                        ),
-                    )
-                    if sep_token != 0
-                    else (event_token,)
-                )
-            ),
-            dtype=TOKEN_DTYPE,
-        )
 
-        times_iter = ShortMemoryIterator(sorted_times)
+        clocked = False
+        tokens = []
+
+        for clock_token, event_token, sep_token in zip_longest(
+            clock_tokens, sorted_event_tokens, separator_tokens
+        ):
+            if not clocked:
+                tokens.append(
+                    self._conv_token_to_uint(
+                        clock_token, self._timeline_end_token
+                    )
+                )
+                clocked = True
+            tokens.append(
+                self._conv_token_to_uint(event_token, self._timeline_end_token)
+            )
+            if sep_token != 0:
+                if isinstance(sep_token, list):
+                    tokens += [
+                        self._conv_token_to_uint(s, self._timeline_end_token)
+                        for s in sep_token
+                    ]
+                else:
+                    tokens.append(
+                        self._conv_token_to_uint(
+                            sep_token, self._timeline_end_token
+                        )
+                    )
+                clocked = False
+
+        tokens = np.array(tokens, dtype=TOKEN_DTYPE)
+
+        times_iter = JanusIterator(sorted_times)
         times = np.fromiter(
             (
                 self._conv_token_to_time(
@@ -123,21 +137,23 @@ class SeparatorInjector:
         if token in self._sep_token_to_time:
             return times_iter.prev + self._sep_token_to_time[token]
         elif token in self._clk2int.values():
-            return times_iter.prev
+            return times_iter.next
         elif token == timeline_end_token:
             return times_iter.prev
         return next(times_iter)
 
 
-class ShortMemoryIterator:
-    def __init__(self, iterable: Iterable):
-        self.iterator = iter(iterable)
+class JanusIterator:
+    """looks forward and backward"""
+    def __init__(self, iterable):
+        self.iterator = chain(iter(iterable), [None])
         self.prev = None
+        self.next = next(self.iterator)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        value = next(self.iterator)
-        self.prev = value
-        return value
+        self.prev = self.next
+        self.next = next(self.iterator)
+        return self.prev
