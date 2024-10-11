@@ -62,6 +62,12 @@ DEFAULT_OUT_DIR = "tokenized_datasets"
     help="Number of processes used to inject separators.",
 )
 @option(
+    "-p",
+    "--plots",
+    default=True,
+    help="Boolean call for plots.",
+)
+@option(
     "--seed",
     default=42,
     show_default=True,
@@ -75,6 +81,7 @@ def tokenize_(
     out: str,
     n_jobs: int,
     seed: int,
+    plots: bool,
 ):
     """Tokenize one of the folds of the MIMIC dataset. The dataset files are
     expected to be in the PROJECT_DATA directory. See README.md for more information.
@@ -138,7 +145,8 @@ def tokenize_(
     separator_time = time.time() - postprocess_start_time
 
     log_statistics_about_timelines(patient_timelines)
-    plot_n_timelines(patient_timelines, vocab)
+    if plots:
+        plot_n_timelines(patient_timelines, vocab)
 
     logger.info(f"Concatenating all timelines...")
     times, tokens, patient_idx_to_id = concatenate_timelines(patient_timelines)
@@ -150,6 +158,11 @@ def tokenize_(
     logger.info("Counts of clock tokens:")
     d = count_clock_tokens(tokens, vocab)
     log_clock_token_counts(d)
+    if plots:
+        plot_clock_histogram(d)
+
+    logger.info("Logging top 10 tokens near midnight...")
+    log_top_tokens_with_clocks(times, tokens, vocab)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     timelines_path = (
@@ -251,3 +264,42 @@ def plot_n_timelines(patient_timelines, vocab, n_tls=100, t_trunc=1000):
     )
     fig.update_layout(coloraxis_showscale=False)
     fig.show()
+
+
+def plot_clock_histogram(d: dict):
+    import pandas as pd
+    import plotly.express as px
+    from ethos.tokenize.special_tokens import SpecialToken
+
+    df = (
+        pd.DataFrame.from_dict(d, orient="index", columns=["count"])
+        .rename_axis(index="clock")
+        .reset_index()
+    )
+    fig = px.bar(df, x="clock", y="count")
+    fig.update_xaxes(
+        categoryorder="array", categoryarray=SpecialToken.CLOCK_NAMES
+    )
+    fig.show()
+
+
+def log_top_tokens_with_clocks(times, tokens, vocab, clocks_ls=(0, 23), k=10):
+    from ethos.tokenize.separators import tm2hr
+    from ethos.tokenize.special_tokens import SpecialToken
+
+    tokens_clk = [
+        vtk
+        for tm, tk in zip(times, tokens)
+        if tm2hr(tm) in clocks_ls
+        and (vtk := vocab.itos[tk]) not in SpecialToken.ALL
+    ]
+    get_counts = lambda v: dict(zip(*np.unique(v, return_counts=True)))
+    tokens_clk_ct = get_counts(tokens_clk)
+    for k, v in sorted(
+        tokens_clk_ct.items(), key=lambda x: x[1], reverse=True
+    )[:k]:
+        logger.info("{:>7}: {}".format(v, k))
+
+
+if __name__ == "__main__":
+    tokenize_()
