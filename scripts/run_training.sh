@@ -1,17 +1,18 @@
 #!/bin/bash -l
 #SBATCH --job-name=ethos_train
-#SBATCH --time=7-00:00:00
-#SBATCH --partition=defq
+#SBATCH --time=5-00:00:00
+#SBATCH --partition=gpuq
 #SBATCH --gres=gpu:8
-#SBATCH --output=ethos_train.log
+#SBATCH --output=slurm/out/ethos_train.log
+#SBATCH --error=slurm/out/ethos_train.err
 
 export OMP_NUM_THREADS=20
 
 case $1 in
 mimic | 1)
   dataset=mimic
-  data_path=mimic_train_timelines_p241015.hdf5
-  vocab_path=mimic_vocab_t4367.pkl
+  data_path=mimic_train_timelines_p296045.hdf5
+  vocab_path=mimic_vocab_t4458.pkl
   val_frac=0.04
   ;;
 *)
@@ -20,28 +21,26 @@ mimic | 1)
   ;;
 esac
 
+source /home/${USER}/.bashrc
+mamba activate ethos
+
 datasets_dir=ethos/data/tokenized_datasets
 data_path=${datasets_dir}/${data_path}
 vocab_path=${datasets_dir}/${vocab_path}
 
 BATCH_SIZE=32
 BLOCK_SIZE=2048
-N_LAYER=10
+N_LAYER=6
 N_HEAD=12
 N_EMBD=768
-DROPOUT=0.1
+DROPOUT=0.3
 LR=0.0006
 MIN_LR=0.00001
+gpu_num=8
 
 model_name="layer_${N_LAYER}_batch_${BATCH_SIZE}_do_${DROPOUT}"
 
-script_body="
-cd /ethos/ethos_deploy
-pip install --no-deps --no-index --no-build-isolation --user -e .
-export PATH=\$HOME/.local/bin:\$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/compat/:/.singularity.d/libs/
-
-torchrun --no_python --standalone --nproc_per_node=8 ethos train \
+torchrun --no_python --standalone --nproc_per_node=$gpu_num ethos train \
   --data_train $data_path \
   --val_frac $val_frac \
   --vocab $vocab_path \
@@ -55,22 +54,12 @@ torchrun --no_python --standalone --nproc_per_node=8 ethos train \
   --min_lr $MIN_LR \
   --log_interval 5 \
   --eval_interval 1000 \
-  --gradient_accumulation_steps 8 \
+  --gradient_accumulation_steps $gpu_num \
   --max_iters 1000000 \
   --lr_decay_iters 50000 \
   --eval_iters 50 \
   --ctx_no_grad \
-  --wandb_project "ethos-$dataset" \
-  --wandb_run_name $model_name \
   --out_dir "out/${dataset}_${model_name}" \
-  --wandb_log
-"
-
-module load singularity
-singularity exec \
-  --contain \
-  --nv \
-  --writable-tmpfs \
-  --bind "$SCRATCH":/ethos \
-  ethos_latest.sif \
-  bash -c "${script_body}"
+  --wandb_log \
+  --wandb_project "divergence" \
+  --wandb_run_name "train_${model_name}"
