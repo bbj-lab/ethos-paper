@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=ethos_train
-#SBATCH --time=5-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --partition=gpuq
 #SBATCH --gres=gpu:8
 #SBATCH --output=slurm/out/ethos_train.log
@@ -11,8 +11,8 @@ export OMP_NUM_THREADS=20
 case $1 in
 mimic | 1)
   dataset=mimic
-  data_path=mimic_train_timelines_p296045.hdf5
-  vocab_path=mimic_vocab_t4458.pkl
+  data_path=mimic_train_timelines_p241015.hdf5
+  vocab_path=mimic_vocab_t4367.pkl
   val_frac=0.04
   ;;
 *)
@@ -24,7 +24,7 @@ esac
 source /home/${USER}/.bashrc
 mamba activate ethos
 
-datasets_dir=ethos/data/tokenized_datasets
+datasets_dir=/gpfs/data/bbj-lab/users/eddie/ethos-paper/ethos/data/tokenized_datasets
 data_path=${datasets_dir}/${data_path}
 vocab_path=${datasets_dir}/${vocab_path}
 
@@ -62,4 +62,6 @@ torchrun --no_python --standalone --nproc_per_node=$gpu_num ethos train \
   --out_dir "out/${dataset}_${model_name}" \
   --wandb_log \
   --wandb_project "divergence" \
-  --wandb_run_name "train_${model_name}"
+  --wandb_run_name "base_v2.2_${model_name}_resume" \
+  --resume \
+  --resume_model "recent_model_800000.pt"
