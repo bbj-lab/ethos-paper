@@ -106,7 +106,10 @@ def train_ethos(args):
         dropout=args.dropout,
     )
     if args.resume:
-        model_path = out_dir / "best_model.pt"
+        if args.resume_model is not None:
+            model_path = out_dir / args.resume_model
+        else:
+            model_path = out_dir / "best_model.pt"
         print(f"Resuming training from {model_path}")
 
         model, iter_num, best_val_loss, optimizer_state = load_model_from_checkpoint(
