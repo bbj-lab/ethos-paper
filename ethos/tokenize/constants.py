@@ -34,14 +34,15 @@ class DataProp:
         dataset = Dataset(dataset_name)
         fold = DataFold(fold_name)
 
-        suffix = "Data"
-        suffix += "Training" if fold == DataFold.TRAIN else "Test"
+        # suffix = "Data"
+        # suffix += "Training" if fold == DataFold.TRAIN else "Test"
+        suffix = "train" if fold == DataFold.TRAIN else "test"
         return DataProp(
             name=dataset,
             fold=fold,
-            dataset_dir="mimic-iv-3.0_Data",
+            dataset_dir="mimic-iv-2.2_Data",
             id_col="subject_id",
-            fold_dir=f"mimic-iv-3.0_{suffix}", # f"{DataFold.TRAIN}"
+            fold_dir=f"{suffix}", # f"{DataFold.TRAIN}"
             fold_suffix="", # f"_{fold.value}"
             csv_format="csv.gz",
             module=dataset.value,
