@@ -102,7 +102,7 @@ def run_inference(loader, args, num_gpus: int = 8):
         )
 
     res_file = results_dir / f"part_{proc_num}{f'_{suffix}' if suffix is not None else ''}"
-    with res_file.with_suffix(".json").open("w") as f:
+    with res_file.with_suffix(".json").open("a") as f:  # append results if file already exists
         json.dump(results, f, indent=4)
 
     th.cuda.empty_cache()

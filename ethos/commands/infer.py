@@ -51,6 +51,8 @@ logger = get_logger()
 @option("--output", default="results", help="Path where to save results.")
 @option("--model_name", default=None, help="Name of the model, used for the output directory.")
 @option("--no_time_offset", is_flag=True, help="Don't do 24h-time-offset for ICU mortality.")
+@option("-p", "--n_parts", type=int, default=1)
+@option("-i", "--ith_part", type=int, default=0)
 def infer(
     test: str,
     model: str,
@@ -65,7 +67,10 @@ def infer(
     output: str,
     model_name: Optional[str],
     no_time_offset: bool,
+    n_parts: int,
+    ith_part: int
 ):
+    assert ith_part in range(n_parts)
     vocab = Vocabulary(PROJECT_DATA / vocab)
 
     test = Test(test)
@@ -119,7 +124,7 @@ def infer(
     logger.info(f"Dataset size: {len(dataset):,}")
 
     data = model, device, vocab, stoi, results_dir, test, suffix, no_compile
-    indices = np.arange(len(dataset))
+    indices = np.array_split(np.arange(len(dataset)), n_parts)[ith_part]
     subsets = (
         Subset(dataset, subset_indices) for subset_indices in np.array_split(indices, n_jobs)
     )
