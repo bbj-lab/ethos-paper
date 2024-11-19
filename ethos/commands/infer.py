@@ -123,6 +123,9 @@ def infer(
     dataset = dataset_cls(data=data, encode=vocab.encode, block_size=block_size)
     logger.info(f"Dataset size: {len(dataset):,}")
 
+    if n_parts > 1:
+        suffix += f"_{ith_part}"
+
     data = model, device, vocab, stoi, results_dir, test, suffix, no_compile
     indices = np.array_split(np.arange(len(dataset)), n_parts)[ith_part]
     subsets = (
