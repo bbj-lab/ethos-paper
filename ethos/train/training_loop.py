@@ -106,7 +106,10 @@ def train_ethos(args):
         dropout=args.dropout,
     )
     if args.resume:
-        model_path = out_dir / "best_model.pt"
+        if args.resume_model is not None:
+            model_path = out_dir / args.resume_model
+        else:
+            model_path = out_dir / "best_model.pt"
         print(f"Resuming training from {model_path}")
 
         model, iter_num, best_val_loss, optimizer_state = load_model_from_checkpoint(
@@ -173,8 +176,13 @@ def train_ethos(args):
                 "iter_num": iter_num,
                 "config": args,
             }
-            th.save(checkpoint, out_dir / "recent_model.pt")
-            print(f"Saved the most recent model.")
+            # save recent model every 100_000 iters 
+            if iter_num %100_000 == 0:
+                th.save(checkpoint, out_dir / f"recent_model_{iter_num}.pt")
+                print(f"Saved the most recent model.")
+            # else:
+            #     th.save(checkpoint, out_dir / "recent_model.pt")
+            #     print(f"Saved the most recent model.")
             if losses["loss/val"] < best_val_loss:
                 th.save(checkpoint, out_dir / "best_model.pt")
                 print(f"Saved the best model: {best_val_loss} => {losses['loss/val']}")

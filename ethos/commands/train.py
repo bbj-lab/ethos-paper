@@ -22,6 +22,7 @@ from ethos.train import train_ethos
 @option("--eval_iters", type=int, default=50)
 @option("--eval_only", is_flag=True)
 @option("--resume", is_flag=True, help="Resume training from the checkpoint.")
+@option("--resume_model", type=str, default=None)
 # wandb logging
 @option("--wandb_log", is_flag=True)
 @option("--wandb_project", default="ethos")
