@@ -53,6 +53,7 @@ logger = get_logger()
 @option("--no_time_offset", is_flag=True, help="Don't do 24h-time-offset for ICU mortality.")
 @option("-p", "--n_parts", type=int, default=1)
 @option("-i", "--ith_part", type=int, default=0)
+@option("-k", "--top_k", type=int, default=None)
 def infer(
     test: str,
     model: str,
@@ -68,7 +69,8 @@ def infer(
     model_name: Optional[str],
     no_time_offset: bool,
     n_parts: int,
-    ith_part: int
+    ith_part: int,
+    top_k: int,
 ):
     assert ith_part in range(n_parts)
     vocab = Vocabulary(PROJECT_DATA / vocab)
@@ -142,5 +144,5 @@ def infer(
         for i, subset in enumerate(subsets)
     ]
     set_start_method("spawn")
-    Parallel(n_jobs=n_jobs)(delayed(run_inference)(loader, data, n_gpus) for loader in loaders)
+    Parallel(n_jobs=n_jobs)(delayed(run_inference)(loader, data, n_gpus, top_k) for loader in loaders)
     logger.info(f"Done, results saved to '{results_dir}'")
