@@ -294,10 +294,10 @@ class Ethos(nn.Module):
             logits[logits < v[:, [-1]]] = -float("Inf")
         probs = F.softmax(logits, dim=-1)
         if top_p is not None:
-            srt, idx = torch.sort(probs, descending=True)
-            csm = torch.cumsum(srt, dim=0)
+            srt, idx = torch.sort(torch.ravel(probs), descending=True)
+            csm = torch.cumsum(srt, dim=-1)
             i = torch.searchsorted(csm, top_p)
-            probs[idx[i + 1 :]] = 0.0
+            probs[:, idx[i + 1 :]] = 0.0
             probs /= probs.sum()
         next_token = torch.multinomial(probs, num_samples=1)
         if return_probs:
