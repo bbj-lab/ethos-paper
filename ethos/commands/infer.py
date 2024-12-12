@@ -54,6 +54,7 @@ logger = get_logger()
 @option("-p", "--n_parts", type=int, default=1)
 @option("-i", "--ith_part", type=int, default=0)
 @option("-k", "--top_k", type=int, default=None)
+@option("-t", "--top_p", type=float, default=None)
 def infer(
     test: str,
     model: str,
@@ -71,8 +72,11 @@ def infer(
     n_parts: int,
     ith_part: int,
     top_k: int,
+    top_p: float,
 ):
     assert ith_part in range(n_parts)
+    assert 0. <= top_p <= 1.
+
     vocab = Vocabulary(PROJECT_DATA / vocab)
 
     test = Test(test)
@@ -144,5 +148,5 @@ def infer(
         for i, subset in enumerate(subsets)
     ]
     set_start_method("spawn")
-    Parallel(n_jobs=n_jobs)(delayed(run_inference)(loader, data, n_gpus, top_k) for loader in loaders)
+    Parallel(n_jobs=n_jobs)(delayed(run_inference)(loader, data, n_gpus, top_k, top_p) for loader in loaders)
     logger.info(f"Done, results saved to '{results_dir}'")

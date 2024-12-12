@@ -284,7 +284,7 @@ class Ethos(nn.Module):
         return idx
 
     @torch.no_grad()
-    def get_next_token(self, tokens, return_probs=False, top_k=None):
+    def get_next_token(self, tokens, return_probs=False, top_k=None, top_p=None):
         if tokens.size(1) > self.config.block_size:
             tokens = tokens[:, -self.config.block_size :]
         logits, _ = self(tokens)
@@ -293,6 +293,12 @@ class Ethos(nn.Module):
             v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
             logits[logits < v[:, [-1]]] = -float("Inf")
         probs = F.softmax(logits, dim=-1)
+        if top_p is not None:
+            srt, idx = torch.sort(probs, descending=True)
+            csm = torch.cumsum(srt, dim=0)
+            i = torch.searchsorted(csm, top_p)
+            probs[idx[i + 1 :]] = 0.0
+            probs /= probs.sum()
         next_token = torch.multinomial(probs, num_samples=1)
         if return_probs:
             return next_token, probs

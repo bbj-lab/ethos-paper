@@ -13,7 +13,7 @@ def get_process_info():
     return proc_name, proc_num
 
 
-def run_inference(loader, args, num_gpus: int = 8, top_k: int = None):
+def run_inference(loader, args, num_gpus: int = 8, top_k: int = None, top_p: float = None):
     model, device, vocab, stoi, results_dir, test_name, suffix, no_compile = args
 
     proc_name, proc_num = get_process_info()
@@ -45,7 +45,7 @@ def run_inference(loader, args, num_gpus: int = 8, top_k: int = None):
                     vocab.encode(["SOFA"]), device=timeline.device, dtype=th.long
                 )
             else:
-                last_token, probs = model.get_next_token(timeline[None, ...], return_probs=True, top_k=top_k)
+                last_token, probs = model.get_next_token(timeline[None, ...], return_probs=True, top_k=top_k, top_p=top_p)
 
             if not offset and len(timeline) == max_timeline_size:
                 offset = 1
