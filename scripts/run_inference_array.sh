@@ -1,14 +1,14 @@
 #!/bin/bash -l
 #SBATCH --job-name=ethos_infer
-#SBATCH --time=10-00:00:00
-#SBATCH --partition=gpuq
-#SBATCH --gres=gpu:8
+#SBATCH --time=2-00:00:00
+#SBATCH --partition=sxmq
+#SBATCH --gres=gpu:2
 #SBATCH --output=slurm/out/ethos_infer_%j.log
 #SBATCH --error=slurm/out/ethos_infer_%j.err
+#SBATCH --array=1-20
 
-gpu_num=8
-rep_start=1
-rep_stop=20
+gpu_num=2
+rep_total=20
 model_variant="best_model.pt"
 
 dataset_dir=tokenized_datasets
@@ -38,19 +38,19 @@ clear
 echo "Running inference for ${dataset} ${test_name}"
 
 # for test_name in "sofa" "drg" "icu_readmission" "admission_mortality" "readmission"; do #"icu_mortality" "mortality"
-for i in $(seq ${rep_start} ${rep_stop}); do
-  echo "[${i}/${rep_stop}]: test=${test_name}, model=${model_variant}, dataset=${dataset}"
-  ethos infer \
-      --test ${test_name} \
-      --model "out/${model_folder}/${model_variant}" \
-      --data ${test_data} \
-      --vocab ${vocab} \
-      --model_name ${model_folder}_${model_variant%_*} \
-      --n_jobs $((${gpu_num}*4)) \
-      --n_gpus ${gpu_num} \
-      ${additional_arg} \
-      --suffix rep${i} || exit 1 
-done
+# for i in $(seq ${rep_start} ${rep_stop}); do
+echo "[${SLURM_ARRAY_TASK_ID}/${rep_total}]: test=${test_name}, model=${model_variant}, dataset=${dataset}"
+ethos infer \
+    --test ${test_name} \
+    --model "out/${model_folder}/${model_variant}" \
+    --data ${test_data} \
+    --vocab ${vocab} \
+    --model_name ${model_folder}_${model_variant%_*} \
+    --n_jobs $((${gpu_num}*4)) \
+    --n_gpus ${gpu_num} \
+    ${additional_arg} \
+    --suffix rep${SLURM_ARRAY_TASK_ID} || exit 1 
+# done
 # done
 # --n_jobs ${gpu_num}
 # --n_jobs $((${gpu_num}*2))

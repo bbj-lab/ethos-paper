@@ -3,6 +3,8 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=gpuq
 #SBATCH --gres=gpu:8
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=32 
 #SBATCH --output=slurm/out/ethos_train.log
 #SBATCH --error=slurm/out/ethos_train.err
 

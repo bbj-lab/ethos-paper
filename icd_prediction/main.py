@@ -10,10 +10,11 @@ from queries import ICD_QUERY, ADMISSIONS_QUERY
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from xgboost import XGBClassifier
-from sklearn.metrics import balanced_accuracy_score, confusion_matrix, recall_score, roc_auc_score
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix, recall_score, roc_auc_score, RocCurveDisplay, roc_curve, auc
+import matplotlib.pyplot as plt
 
 ICD_CM_9_TO_10_MAPPING_FILE = "/gpfs/data/bbj-lab/users/eddie/ethos-paper/ethos/data/icd_cm_9_to_10_mapping.csv.gz"
-
+ICD_CM_10_TO_9_MAPPING_FILE = "icd_cm_10_to_9_mapping.csv"
 
 def connect_to_database(cdict:dict):
     """Connect to database
@@ -49,19 +50,26 @@ def connect_to_database(cdict:dict):
         return None, None
 
 # function from ethos.tokenize.translation_base Class IcdMixin
-def create_icd_9_to_10_translation():
-    """Return a dict that maps icd codes from version 9 to version 10
+def create_icd_translation(is_9_to_10:bool=True):
+    """Return a dict that maps icd codes from one of versions to the other one (9 to 10 or 10 to 9)
     @return version_mapping (str[str])
     """
-    version_mapping = pd.read_csv(ICD_CM_9_TO_10_MAPPING_FILE, dtype=str)
-    version_mapping.drop_duplicates(subset="icd_9", inplace=True)
-    version_mapping = version_mapping.groupby("icd_9").icd_10.apply(
-        lambda values: min(values, key=len)
-    )
+    if is_9_to_10:
+        version_mapping = pd.read_csv(ICD_CM_9_TO_10_MAPPING_FILE, dtype=str)
+        version_mapping.drop_duplicates(subset="icd_9", inplace=True)
+        version_mapping = version_mapping.groupby("icd_9").icd_10.apply(
+            lambda values: min(values, key=len)
+        )
+    else:
+        version_mapping = pd.read_csv(ICD_CM_10_TO_9_MAPPING_FILE, dtype=str)
+        version_mapping.drop_duplicates(subset="icd10cm", inplace=True)
+        version_mapping = version_mapping.groupby("icd10cm").icd9cm.apply(
+            lambda values: min(values, key=len)
+        )        
     return version_mapping.to_dict()
 
-def translate_icd_9_to_10(version_mapping:dict, left_digits:int|None,
-                          df:pd.DataFrame, version_col:str='icd_version', code_col:str="icd_code") -> pd.DataFrame:
+def translate_icd(version_mapping:dict, left_digits:int|None,
+                  df:pd.DataFrame, from_version:int=9, to_version:int=10, version_col:str='icd_version', code_col:str="icd_code") -> pd.DataFrame:
     """Map df icd code columns from version 9 to version 10
     @var version_mapping (str[str]) : dict that maps between icd code 9 and 10 
     @var left_digits (int) : icd code rolled up to certain left digits 
@@ -71,19 +79,35 @@ def translate_icd_9_to_10(version_mapping:dict, left_digits:int|None,
 
     @return df (pd.DataFrame) 
     """
-    is_version_9 = df[version_col] == 9
-    df[code_col] = df[code_col].astype(str).str.strip()
-    df.loc[is_version_9, code_col] = df.loc[is_version_9, code_col].map(version_mapping).fillna(df[code_col])
+    assert from_version == 9 or from_version == 10
+    assert to_version == 9 or to_version == 10
 
+    df_new = df.copy()
+    
+    is_from_version = df_new[version_col] == from_version
+    df_new[code_col] = df_new[code_col].astype(str).str.strip()
+
+    # Function to map based on original and truncated lengths
+    def map_code(code):
+        mapped = version_mapping.get(code)  # Attempt mapping on original
+        if mapped is not None:
+            return mapped
+        if left_digits is not None and len(code) > left_digits:
+            truncated = code[:left_digits]
+            return version_mapping.get(truncated, code)  # Map truncated or keep original
+        return code  # Keep original if no mapping found
+
+    df_new.loc[is_from_version, code_col] = df_new.loc[is_from_version, code_col].apply(map_code)
+    
     # Update icd_version to 10 for successfully mapped codes
-    mask = is_version_9 & df[code_col].isin(version_mapping.values())
-    df.loc[mask, version_col] = 10
+    mask = is_from_version & df_new[code_col].isin(version_mapping.values())
+    df_new.loc[mask, version_col] = to_version
 
     # roll up icd codes
     if left_digits is not None:
-        df[code_col] = df[code_col].apply(lambda x: x[:left_digits] if len(x) > left_digits else x)
+        df_new[code_col] = df_new[code_col].apply(lambda x: x[:left_digits] if len(x) > left_digits else x)
 
-    return df
+    return df_new
 
 def load_query_data(path:str, query:str, cn):
     """Query data or load data if data are pre-saved. 
@@ -174,7 +198,9 @@ def train_test_split(df:pd.DataFrame, time_col:str="admittime", key_col:str="sub
 
     return train_dataset, valid_dataset, test_dataset
 
-def sklearn_train_loop(model, train_X:pd.DataFrame, train_y:pd.DataFrame, test_X:pd.DataFrame, test_y:pd.DataFrame):
+def sklearn_train_loop(model, 
+                       train_X:pd.DataFrame, train_y:pd.DataFrame, 
+                       test_X:pd.DataFrame, test_y:pd.DataFrame):
     print("-"*50)
     print(model)
     model.fit(train_X, train_y)
@@ -200,7 +226,11 @@ def sklearn_train_loop(model, train_X:pd.DataFrame, train_y:pd.DataFrame, test_X
         print("{} balanced accuracy: {:.2f}%".format(mode, balanced_accuracy*100))
 
         # RoC 
-        print(f"{mode} RoC AUC score:", roc_auc_score(y, preds))
+        # print(f"{mode} RoC AUC score:", roc_auc_score(y, preds))
+        print(f"{mode} RoC AUC score:", roc_auc_score(y, model.predict_proba(X)[:, 1]))
+
+    return model 
+
 
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser()
@@ -222,9 +252,10 @@ if __name__ == "__main__":
     # get dummies
     admissions_df = pd.get_dummies(admissions_df, columns=['gender'], drop_first=True)
 
-    version_mapping = create_icd_9_to_10_translation()
+    # map version 10 to version 9
+    version_mapping = create_icd_translation(is_9_to_10=False)
 
-    icd_df = translate_icd_9_to_10(version_mapping=version_mapping, left_digits=icd_code_digits, df=icd_df)
+    icd_df = translate_icd(version_mapping=version_mapping, from_version=10, to_version=9, left_digits=icd_code_digits, df=icd_df)
 
     icd_dummies = get_icd_code_dummies(
         data_path=f"data/icd_dummies_d{icd_code_digits}.npz", 
@@ -259,22 +290,39 @@ if __name__ == "__main__":
     test_X = scaler.transform(test_X)
 
     # models 
-    sklearn_train_loop(LogisticRegression(class_weight='balanced', n_jobs=-1, max_iter=1_000_000), 
+    lr = sklearn_train_loop(LogisticRegression(class_weight='balanced', n_jobs=-1, max_iter=1_000_000), 
                 train_X, train_y,
                 test_X, test_y)
     
-    sklearn_train_loop(RandomForestClassifier(max_depth=100, n_jobs=-1, class_weight='balanced'), 
+    rf = sklearn_train_loop(RandomForestClassifier(max_depth=10, n_jobs=-1, class_weight='balanced'), 
             train_X, train_y,
             test_X, test_y)
     
     pos_weight = (len(train_y) - sum(train_y)) / sum(train_y)
-    sklearn_train_loop(XGBClassifier(n_jobs=-1, scale_pos_weight=pos_weight), 
+    xgboost = sklearn_train_loop(XGBClassifier(n_jobs=-1, scale_pos_weight=pos_weight), 
                 train_X, train_y,
                 test_X, test_y)
 
+    
+    models = [lr, rf, xgboost]  # Replace with your actual models
+    model_names = ["Logistics Regression", "Random Forest", "XGBoost"]  # Replace with your model names
+    colors = ['blue', 'green', 'red']  # Colors for each model
 
+    plt.figure(figsize=(8, 6))
 
+    for model, name, color in zip(models, model_names, colors):
+        # Get predicted probabilities for the positive class
+        y_pred = model.predict_proba(test_X)[:, 1]  
+        fpr, tpr, _ = roc_curve(test_y, y_pred)  
+        roc_auc = auc(fpr, tpr)
+        
+        # Plot ROC curve
+        RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc, estimator_name=name).plot(ax=plt.gca(), color=color)
 
+    # Add plot title and legend
+    plt.title(f"ROC Curves for Multiple Models (Max {icd_code_digits} length of ICD codes)")
+    plt.legend(loc="lower right")
+    plt.savefig(f"plots/roc_d{icd_code_digits}.png")
 
 
 
