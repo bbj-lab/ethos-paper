@@ -20,6 +20,7 @@ def run_inference(loader, args, num_gpus: int = 8):
     if device == "cuda":
         device = f"cuda:{proc_num % num_gpus}"
         th.cuda.set_device(device)
+    # print(proc_name, proc_num, device)
     model.to(device)
     if not no_compile:
         model = th.compile(model)

@@ -1,0 +1,8 @@
+{
+    "host": null,
+    "port": null,
+    "user": "postgres",
+    "password": "postgres",
+    "dbname": "mimiciv",
+    "schema_name": "mimiciv_hosp"
+}
